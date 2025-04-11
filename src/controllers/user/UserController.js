@@ -1,6 +1,6 @@
 import User from '../../models/UserModel.js';
 import { signInToken } from '../../utils/auth.js';
-import { fail, md5Hash, success } from '../../utils/helper.js';
+import { fail, generateOTP, md5Hash, sendEmail, success } from '../../utils/helper.js';
 
 const login = async (req, res) => {
     try {
@@ -133,4 +133,149 @@ const deleteProfile = async (req, res) => {
     }
 };
 
-export { login, signUp, updateProfile, deleteProfile };
+const getProfile = async (req, res) => {
+    try {
+        const userId = req.userId;
+
+        const user = await User.findById(userId).select("-password -__v -updatedAt");
+        if (!user) {
+            return fail(res, "User not found.");
+        }
+
+        return success(res, "User profile fetched successfully", user);
+    } catch (error) {
+        return fail(res, error.message);
+    }
+};
+
+const changePassword = async (req, res) => {
+    try {
+        const userId = req.userId;
+        if (!userId) return fail(res, "User not found.");
+
+        const { currentPassword, newPassword, confirmPassword } = req.body;
+
+        if (!currentPassword) {
+            return fail(res, "currentPassword  is required");
+        }
+        if (!newPassword) {
+            return fail(res, "please enter new password!");
+        }
+        if (!confirmPassword) {
+            return fail(res, "Please confirm your password!");
+        }
+        if (newPassword !== confirmPassword) {
+            return fail(res, "new password and confirm password are not match!");
+        }
+        if (currentPassword === newPassword) {
+            return fail(res, "New password cannot be the same as current password.");
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return fail(res, "User not found.");
+        }
+
+        const hashedCurrentPassword = md5Hash(currentPassword);
+        if (user.password !== hashedCurrentPassword) {
+            return fail(res, "Current password is incorrect.");
+        }
+
+        user.password = md5Hash(newPassword);
+
+        await user.save();
+
+        return success(res, "Password changed successfully.");
+    } catch (error) {
+        return Helper.fail(res, error.message);
+    }
+};
+
+const sentOtp = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return fail(res, "email  is required");
+        }
+        const otp = generateOTP()
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return fail(res, "This email is not registered.");
+        }
+
+        user.otp = otp;
+        await user.save();
+
+        await sendEmail(email, otp);
+
+        return success(res, "OTP has been sent to your email address.");
+    } catch (error) {
+        return fail(res, error.message);
+    }
+}
+
+const emailVerify = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        if (!otp) {
+            return Helper.fail(res, "please enter otp!");
+        }
+        const userData = await UserModel.findOne({ email: email, otp: otp });
+        if (!userData) {
+            return Helper.fail(res, "user not found!");
+        }
+        if (otp !== userData.otp) {
+            return Helper.fail(res, "Invalid OTP");
+        }
+
+        return Helper.success(res, "email verified successfully!");
+    }
+    catch (error) {
+        return Helper.fail(res, error.message);
+    }
+}
+
+const resetPassword = async (req, res) => {
+    try {
+        const { email, newPassword, confirmPassword } = req.body;
+        if (!email) {
+            return fail(res, "email  is required");
+        }
+
+        if (!newPassword) {
+            return fail(res, "please enter new password!");
+        }
+        if (!confirmPassword) {
+            return fail(res, "Please confirm your password!");
+        }
+        if (newPassword !== confirmPassword) {
+            return fail(res, "new password and confirm password are not match!");
+        }
+
+        const user = await User.findOne({ email: email });
+
+        if (!user) {
+            return fail(res, "User not found.");
+        }
+
+        user.password = md5Hash(newPassword);
+        await user.save();
+
+        return success(res, "password changed successfully!");
+    } catch (error) {
+        return fail(res, error.message);
+    }
+};
+
+
+export {
+    login,
+    signUp,
+    updateProfile,
+    deleteProfile,
+    getProfile,
+    changePassword,
+    sentOtp,
+    resetPassword
+};
