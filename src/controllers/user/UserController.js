@@ -165,7 +165,7 @@ const changePassword = async (req, res) => {
             return fail(res, "Please confirm your password!");
         }
         if (newPassword !== confirmPassword) {
-            return fail(res, "new password and confirm password are not match!");
+            return fail(res, "New password and confirm password do not match.");
         }
         if (currentPassword === newPassword) {
             return fail(res, "New password cannot be the same as current password.");
@@ -187,7 +187,7 @@ const changePassword = async (req, res) => {
 
         return success(res, "Password changed successfully.");
     } catch (error) {
-        return Helper.fail(res, error.message);
+        return fail(res, error.message);
     }
 };
 
@@ -205,6 +205,8 @@ const sentOtp = async (req, res) => {
         }
 
         user.otp = otp;
+        user.otpExpiresAt = Date.now() + 10 * 60 * 1000;
+
         await user.save();
 
         await sendEmail(email, otp);
@@ -218,21 +220,34 @@ const sentOtp = async (req, res) => {
 const emailVerify = async (req, res) => {
     try {
         const { email, otp } = req.body;
+
+        if (!email) {
+            return fail(res, "Email is required.");
+        }
         if (!otp) {
-            return Helper.fail(res, "please enter otp!");
-        }
-        const userData = await UserModel.findOne({ email: email, otp: otp });
-        if (!userData) {
-            return Helper.fail(res, "user not found!");
-        }
-        if (otp !== userData.otp) {
-            return Helper.fail(res, "Invalid OTP");
+            return fail(res, "OTP is required.");
         }
 
-        return Helper.success(res, "email verified successfully!");
+        const user = await User.findOne({ email });
+        if (!user) {
+            return fail(res, "User not found.");
+        }
+        if (user.otp !== otp) {
+            return fail(res, "Invalid OTP.");
+        }
+        if (user.otpExpiresAt < Date.now()) {
+            return fail(res, "OTP has expired.");
+        }
+
+        user.otp = undefined;
+        user.isVerified = true;
+
+        await user.save();
+
+        return success(res, "email verified successfully!");
     }
     catch (error) {
-        return Helper.fail(res, error.message);
+        return fail(res, error.message);
     }
 }
 
@@ -277,5 +292,6 @@ export {
     getProfile,
     changePassword,
     sentOtp,
+    emailVerify,
     resetPassword
 };
