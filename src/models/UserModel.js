@@ -11,6 +11,8 @@ const UserSchema = new Schema({
     otpExpiresAt: { type: Date },
     isVerified: { type: Boolean, default: false },
     isDeactive: { type: Boolean, default: false },
+    isProfilePublic: { type: Boolean, default: true },
+    notification: { type: Boolean, default: true },
 }, { timestamps: true });
 
 const User = mongoose.model("User", UserSchema);

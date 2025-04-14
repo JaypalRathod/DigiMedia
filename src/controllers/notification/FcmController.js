@@ -40,6 +40,7 @@ const sendNotificationToUser = async (userId, title, message, image) => {
                     ...(image && { imageUrl: image }),
                 },
                 token: userTokenObj.token,
+                android: { priority: "high" },
             };
 
             const response = await admin.messaging().send(messagePayload);
@@ -75,4 +76,67 @@ const notificationAdd = async (type, message, image, itemId, userId, sendFCM = t
     }
 };
 
-export { fcmToken, sendNotificationToUser, notificationAdd };
+
+const sendPush = async (notificationObj) => {
+    try {
+        let { title, body, image, token, userId, userIds, data } = notificationObj;
+
+        // Single user
+        if (userId) {
+            let userTokenObj = await FcmToken.findOne({ userId: ObjectId(userId) }).select({ token: 1 });
+            if (userTokenObj) {
+                token = userTokenObj.token;
+            }
+        }
+
+        // Multiple users
+        if (userIds) {
+            const tokens = await FcmToken.find({
+                userId: { $in: userIds.map(id => ObjectId(id)) },
+            }).select("token");
+
+            token = tokens.map(e => e.token);
+        }
+
+        if (token) {
+            let response = await requestSendPush(title, body, image, token, data);
+            return { success: true, message: "Success!", data: response };
+        }
+
+        return { success: false, message: "No token found" };
+    } catch (error) {
+        console.error(error);
+        return { success: false, message: error.message };
+    }
+};
+
+
+async function requestSendPush(title, body, image, token, data) {
+    const notification = { title, body };
+    if (image) notification.imageUrl = image;
+
+    const message = {
+        notification,
+        android: { priority: "high" },
+        apns: { headers: { "apns-priority": "10" } },
+    };
+
+    if (data) {
+        message.data = {
+            ...(data.msg ? { msg: JSON.stringify(data) } : { data: JSON.stringify(data) }),
+        };
+    }
+
+    if (Array.isArray(token)) {
+        message.tokens = token;
+        const response = await admin.messaging().sendEachForMulticast(message);
+        return response;
+    } else {
+        message.token = token;
+        const response = await admin.messaging().send(message);
+        return response;
+    }
+}
+
+
+export { fcmToken, sendNotificationToUser, notificationAdd, sendPush };
