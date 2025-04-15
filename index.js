@@ -6,7 +6,8 @@ import admin from "firebase-admin";
 import { createRequire } from 'module';
 import { initSocket } from './socket.js';
 import http from 'http';
-import { rateLimit } from 'express-rate-limit'
+import { rateLimit } from 'express-rate-limit';
+import cors from 'cors';
 
 const require = createRequire(import.meta.url);
 
@@ -30,7 +31,9 @@ const StartServer = async () => {
     legacyHeaders: false,
   })
 
-  app.use(limiter)
+  app.use(limiter);
+
+  app.use(cors());
 
   await dbConnection();
 
