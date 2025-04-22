@@ -18,7 +18,7 @@ const StartServer = async () => {
   const app = express();
   const PORT = process.env.PORT || 5000;
 
-  const serviceAccount = require('./firebase/friendzy_firebase.json');
+  const serviceAccount = require('./firebase');
 
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
